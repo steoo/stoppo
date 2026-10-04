@@ -1,12 +1,13 @@
 :root {
-  --bg: #1b1f2a;
-  --panel: #252b3a;
-  --panel-2: #2f3648;
-  --text: #f2f4f8;
-  --muted: #9aa3b8;
-  --accent: #ffd54f;
-  --station: #ffffff;
-  --station-ring: #1b1f2a;
+  --bg: #d8d9d2;
+  --panel: #f3f3ec;
+  --panel-2: #e6e6dd;
+  --text: #1f2124;
+  --muted: #6b6e68;
+  --accent: #ffee7a;
+  --note-edge: #2a2a24;
+  --station: #efefeb;
+  --station-ring: #55554f;
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-top: env(safe-area-inset-top, 0px);
 }
@@ -16,7 +17,11 @@
 html, body {
   margin: 0;
   height: 100%;
-  background: var(--bg);
+  background:
+    linear-gradient(90deg, transparent 33%, rgba(255,255,255,0.35) 33.2%, rgba(0,0,0,0.05) 33.6%, transparent 34%),
+    linear-gradient(90deg, transparent 66%, rgba(255,255,255,0.35) 66.2%, rgba(0,0,0,0.05) 66.6%, transparent 67%),
+    linear-gradient(0deg, transparent 49.6%, rgba(0,0,0,0.05) 50%, rgba(255,255,255,0.35) 50.4%, transparent 51%),
+    var(--bg);
   color: var(--text);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   -webkit-tap-highlight-color: transparent;
@@ -44,6 +49,8 @@ button {
 button:active { transform: scale(0.96); }
 button:disabled { opacity: 0.35; }
 button.primary { background: var(--accent); color: #222; font-weight: 600; }
+.toolbar button, dialog button:not(.icon-btn) { background: var(--accent); border: 1.5px solid var(--note-edge); box-shadow: 1px 2px 0 rgba(0,0,0,0.25); }
+.toolbar button:disabled { box-shadow: none; }
 
 .icon-btn {
   width: 44px;
@@ -83,9 +90,10 @@ button.primary { background: var(--accent); color: #222; font-weight: 600; }
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--panel-2);
+  background: var(--accent);
+  border: 1.5px solid var(--note-edge);
   padding: 8px 14px;
-  border-radius: 999px;
+  border-radius: 10px;
   font-size: 14px;
   opacity: 0;
   transition: opacity 0.2s;
@@ -100,17 +108,16 @@ button.primary { background: var(--accent); color: #222; font-weight: 600; }
   user-select: none;
 }
 
-.track { stroke-linecap: round; fill: none; }
-.station { fill: var(--station); stroke: var(--station-ring); stroke-width: 0.06; }
-.goal-ring { fill: none; stroke-width: 0.09; }
-.goal-ring.pulse { animation: goalPulse 1.6s ease-in-out infinite; }
-@keyframes goalPulse { 50% { opacity: 0.35; } }
+.track { stroke-linecap: round; fill: none; opacity: 0.88; }
+.station { fill: var(--station); stroke: var(--station-ring); stroke-width: 0.025; }
+.goal-ring { fill: none; stroke: none; }
+.goal-ring-band { fill: none; stroke-width: 0.17; }
+.goal-ring-edge { fill: none; stroke: var(--station-ring); stroke-width: 0.025; }
 
 .dest {
-  fill: #fff;
-  stroke: var(--bg);
-  stroke-width: 0.05;
-  opacity: 0.9;
+  fill: rgba(255, 255, 255, 0.85);
+  stroke: #333;
+  stroke-width: 0.04;
   cursor: pointer;
   animation: destPulse 0.9s ease-in-out infinite;
   transform-box: fill-box;
@@ -120,27 +127,29 @@ button.primary { background: var(--accent); color: #222; font-weight: 600; }
 
 .car {
   cursor: pointer;
-  transition: transform 160ms ease-out;
+  transition: transform var(--move-ms, 160ms) ease-out;
 }
-.car .body { stroke: rgba(0, 0, 0, 0.55); stroke-width: 0.05; }
-.car.selected .body { stroke: #fff; stroke-width: 0.1; filter: drop-shadow(0 0 0.12px #fff); }
+.car.dragging { transition: none; }
+.car .body { stroke: rgba(0, 0, 0, 0.45); stroke-width: 0.025; }
+.car .gloss { fill: #fff; opacity: 0.28; pointer-events: none; }
+.car.selected .body { stroke: #222; stroke-width: 0.07; }
 .car.stuck { animation: shake 0.25s; }
 @keyframes shake {
   25% { translate: -0.08px 0; }
   75% { translate: 0.08px 0; }
 }
-.car .star { fill: #fff; stroke: rgba(0, 0, 0, 0.6); stroke-width: 0.03; pointer-events: none; }
-.car .window { fill: rgba(255, 255, 255, 0.45); pointer-events: none; }
-.car.hint .body { stroke: #fff; stroke-width: 0.12; stroke-dasharray: 0.15 0.1; }
+.car .train { fill: #fff; pointer-events: none; }
+.car .train-glass { fill: var(--car-color); pointer-events: none; }
+.car.hint .body { stroke: #222; stroke-width: 0.08; stroke-dasharray: 0.12 0.08; }
 
 /* Toolbar */
 .toolbar {
   display: grid;
-  grid-template-columns: 48px 1fr 1fr 1fr 48px;
-  gap: 8px;
+  grid-template-columns: 44px repeat(4, 1fr) 44px;
+  gap: 6px;
   padding: 10px 16px calc(12px + var(--safe-bottom));
 }
-.toolbar button { padding: 14px 0; font-size: 15px; }
+.toolbar button { padding: 14px 0; font-size: 14px; }
 #btn-prev, #btn-next { font-size: 22px; }
 
 /* Dialogs as bottom sheets */
@@ -155,10 +164,10 @@ dialog.sheet {
   padding: 16px 16px calc(20px + var(--safe-bottom));
   max-height: 85dvh;
 }
-dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
+dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.4); }
 .sheet-head { display: flex; align-items: center; justify-content: space-between; }
 .sheet-head h2 { margin: 0; font-size: 20px; }
-.help p { line-height: 1.5; color: #d9deea; }
+.help p { line-height: 1.5; color: var(--text); }
 
 .level-grid {
   display: grid;
@@ -178,13 +187,13 @@ dialog.sheet::backdrop { background: rgba(0, 0, 0, 0.55); }
   position: relative;
 }
 .level-grid button small { font-size: 10px; font-weight: 500; color: var(--muted); }
-.level-grid button.current { outline: 2px solid var(--accent); }
-.level-grid button.solved { background: #2e5a3a; }
-.level-grid button.perfect { background: #6b5a1c; }
+.level-grid button.current { outline: 2px solid var(--note-edge); }
+.level-grid button.solved { background: #b9dcb9; }
+.level-grid button.perfect { background: var(--accent); }
 
 dialog.win { text-align: center; }
 dialog.win h2 { margin: 6px 0; font-size: 26px; }
-dialog.win p { color: #d9deea; }
+dialog.win p { color: var(--text); }
 .win-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 16px; }
 
 @media (min-width: 700px) {

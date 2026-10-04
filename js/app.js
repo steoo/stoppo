@@ -3,13 +3,15 @@ import { LEVELS } from './levels.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 const STORE_KEY = 'subway-shuffle/v1';
-const CAR = 0.56; // car size in grid units
+const R_STATION = 0.27;
+const R_GOAL = 0.4;
 
 const $ = (id) => document.getElementById(id);
 const board = $('board');
 
 const store = loadStore();
 let level, adj, positions, history, selected, carEls, hint;
+let autoplay = null; // { timer, moves, step } while the solver plays the level
 
 function loadStore() {
   try {
@@ -32,6 +34,7 @@ function el(tag, attrs = {}, parent) {
 // ---------- level lifecycle ----------
 
 function loadLevel(index) {
+  stopAutoplay();
   store.current = Math.max(0, Math.min(LEVELS.length - 1, index));
   saveStore();
   level = LEVELS[store.current];
@@ -52,20 +55,42 @@ function render() {
   board.setAttribute('viewBox', `${minX} ${minY} ${Math.max(...xs) - minX + pad} ${Math.max(...ys) - minY + pad}`);
 
   // Tracks
+  // Tracks; several lines between the same two stations run side by side
   const tracks = el('g', {}, board);
+  const pairs = new Map();
   for (const [a, b, c] of level.edges) {
+    const key = a < b ? `${a}-${b}` : `${b}-${a}`;
+    if (!pairs.has(key)) pairs.set(key, { a: Math.min(a, b), b: Math.max(a, b), colors: [] });
+    pairs.get(key).colors.push(c);
+  }
+  for (const { a, b, colors } of pairs.values()) {
     const [x1, y1] = level.nodes[a], [x2, y2] = level.nodes[b];
-    el('line', { x1, y1, x2, y2, class: 'track', stroke: COLORS[c].fill, 'stroke-width': 0.2 }, tracks);
+    const len = Math.hypot(x2 - x1, y2 - y1);
+    const nx = -(y2 - y1) / len, ny = (x2 - x1) / len; // unit normal
+    const width = colors.length > 1 ? 0.16 : 0.27;
+    colors.forEach((c, k) => {
+      const off = (k - (colors.length - 1) / 2) * width;
+      el('line', {
+        x1: x1 + nx * off, y1: y1 + ny * off, x2: x2 + nx * off, y2: y2 + ny * off,
+        class: 'track', stroke: COLORS[c].fill, 'stroke-width': width,
+      }, tracks);
+    });
   }
 
-  // Goal station ring, in the target car's color
+  // Stations; the goal gets a thick ring in the target car's color
   const [gx, gy] = level.nodes[level.target.node];
   const targetColor = COLORS[level.cars[level.target.car][1]].fill;
-  el('circle', { cx: gx, cy: gy, r: 0.47, class: 'goal-ring pulse', stroke: targetColor }, board);
-
-  // Stations
   const stations = el('g', {}, board);
-  level.nodes.forEach(([cx, cy]) => el('circle', { cx, cy, r: 0.15, class: 'station' }, stations));
+  level.nodes.forEach(([cx, cy], n) => {
+    if (n === level.target.node) {
+      el('circle', { cx: gx, cy: gy, r: R_GOAL + 0.085, class: 'goal-ring-edge' }, stations);
+      el('circle', { cx: gx, cy: gy, r: R_GOAL, class: 'goal-ring-band', stroke: targetColor }, stations);
+      el('circle', { cx: gx, cy: gy, r: R_GOAL - 0.085, class: 'goal-ring-edge' }, stations);
+      el('circle', { cx: gx, cy: gy, r: R_GOAL - 0.085, class: 'station', stroke: 'none' }, stations);
+    } else {
+      el('circle', { cx, cy, r: R_STATION, class: 'station' }, stations);
+    }
+  });
 
   // Destination markers live in their own layer, refreshed on selection
   el('g', { id: 'dests' }, board);
@@ -74,26 +99,22 @@ function render() {
   const cars = el('g', {}, board);
   carEls = level.cars.map(([, c], i) => {
     const g = el('g', { class: 'car', 'data-car': i }, cars);
-    el('rect', { class: 'body', x: -CAR / 2, y: -CAR / 2, width: CAR, height: CAR, rx: 0.12, fill: COLORS[c].fill }, g);
+    g.style.setProperty('--car-color', COLORS[c].fill);
+    el('circle', { class: 'body', r: R_STATION, fill: COLORS[c].fill }, g);
+    el('ellipse', { class: 'gloss', cx: 0, cy: -0.13, rx: 0.17, ry: 0.09 }, g);
     if (i === level.target.car) {
-      el('path', { class: 'star', d: starPath(0.2, 0.09) }, g);
-    } else {
-      el('rect', { class: 'window', x: -0.17, y: -0.13, width: 0.34, height: 0.14, rx: 0.04 }, g);
+      // Little front-on train
+      el('rect', { class: 'train', x: -0.14, y: -0.17, width: 0.28, height: 0.3, rx: 0.06 }, g);
+      el('rect', { class: 'train-glass', x: -0.1, y: -0.12, width: 0.2, height: 0.1, rx: 0.02 }, g);
+      el('circle', { class: 'train-glass', cx: -0.07, cy: 0.06, r: 0.025 }, g);
+      el('circle', { class: 'train-glass', cx: 0.07, cy: 0.06, r: 0.025 }, g);
+      el('rect', { class: 'train', x: -0.12, y: 0.15, width: 0.07, height: 0.04, rx: 0.015 }, g);
+      el('rect', { class: 'train', x: 0.05, y: 0.15, width: 0.07, height: 0.04, rx: 0.015 }, g);
     }
     return g;
   });
 
   update();
-}
-
-function starPath(R, r) {
-  let d = '';
-  for (let i = 0; i < 10; i++) {
-    const rad = i % 2 ? r : R;
-    const a = (Math.PI / 5) * i - Math.PI / 2;
-    d += `${i ? 'L' : 'M'}${(rad * Math.cos(a)).toFixed(3)} ${(rad * Math.sin(a)).toFixed(3)}`;
-  }
-  return d + 'Z';
 }
 
 function update() {
@@ -152,6 +173,7 @@ function moveTo(node) {
 }
 
 function undo() {
+  stopAutoplay();
   if (!history.length) return;
   positions = history.pop();
   selected = null;
@@ -160,6 +182,7 @@ function undo() {
 }
 
 function reset() {
+  stopAutoplay();
   positions = initialState(level);
   history = [];
   selected = null;
@@ -181,6 +204,41 @@ function showHint() {
   flashStatus(`${moves.length} moves to go`);
 }
 
+// Testing aid: the solver plays the level from the current position.
+function toggleAutoplay() {
+  if (autoplay) { stopAutoplay(); return; }
+  if (isSolved(level, positions)) return;
+  const { moves } = solve(level, positions);
+  if (!moves?.length) { flashStatus('No solution from here — try Reset'); return; }
+  // Short solutions play at a watchable pace, long ones speed up (level 100 takes ~25 s).
+  const ms = Math.max(40, Math.min(350, 12000 / moves.length));
+  board.style.setProperty('--move-ms', `${Math.round(ms * 0.8)}ms`);
+  selected = null;
+  hint = null;
+  autoplay = { moves, step: 0, timer: setInterval(autoStep, ms) };
+  $('btn-solve').textContent = 'Stop';
+  update();
+}
+
+function autoStep() {
+  const { car, to } = autoplay.moves[autoplay.step++];
+  history.push(positions.slice());
+  positions[car] = to;
+  update();
+  if (autoplay.step === autoplay.moves.length) {
+    stopAutoplay();
+    setTimeout(() => win({ auto: true }), 300);
+  }
+}
+
+function stopAutoplay() {
+  if (!autoplay) return;
+  clearInterval(autoplay.timer);
+  autoplay = null;
+  board.style.removeProperty('--move-ms');
+  $('btn-solve').textContent = 'Solve';
+}
+
 function flashStatus(text) {
   const toast = $('toast');
   toast.textContent = text;
@@ -189,14 +247,20 @@ function flashStatus(text) {
   flashStatus.t = setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
-function win() {
+function win({ auto = false } = {}) {
   const n = history.length;
-  const prev = store.best[store.current];
-  if (prev == null || n < prev) store.best[store.current] = n;
-  saveStore();
   const par = level.par;
-  let text = `${level.name} solved in ${n} move${n === 1 ? '' : 's'}.`;
-  if (par != null) text += n <= par ? ' That matches par — perfect!' : ` Par is ${par}.`;
+  let text;
+  if (auto) {
+    // Don't record auto-solves as the player's best.
+    text = `The solver finished ${level.name} in ${n} move${n === 1 ? '' : 's'} (par ${par}).`;
+  } else {
+    const prev = store.best[store.current];
+    if (prev == null || n < prev) store.best[store.current] = n;
+    saveStore();
+    text = `${level.name} solved in ${n} move${n === 1 ? '' : 's'}.`;
+    if (par != null) text += n <= par ? ' That matches par — perfect!' : ` Par is ${par}.`;
+  }
   $('win-text').textContent = text;
   $('win-next').disabled = store.current === LEVELS.length - 1;
   $('dlg-win').showModal();
@@ -214,6 +278,7 @@ function toBoard(evt) {
 let drag = null;
 
 board.addEventListener('pointerdown', (evt) => {
+  if (autoplay) return;
   const carEl = evt.target.closest('.car');
   const destEl = evt.target.closest('.dest');
   if (destEl) { moveTo(Number(destEl.dataset.node)); return; }
@@ -221,7 +286,7 @@ board.addEventListener('pointerdown', (evt) => {
     const i = Number(carEl.dataset.car);
     const wasSelected = selected === i;
     if (!wasSelected) select(i);
-    drag = { car: i, start: toBoard(evt), wasSelected };
+    drag = { car: i, start: toBoard(evt), wasSelected, moved: false, along: null };
     board.setPointerCapture(evt.pointerId);
     return;
   }
@@ -232,20 +297,49 @@ board.addEventListener('pointerdown', (evt) => {
   if (selected != null) { selected = null; hint = null; update(); }
 });
 
-board.addEventListener('pointerup', (evt) => {
-  if (!drag) return;
+// While dragging, the car slides along whichever open track is closest to the finger.
+board.addEventListener('pointermove', (evt) => {
+  if (!drag || selected !== drag.car) return;
   const p = toBoard(evt);
-  const moved = Math.hypot(p.x - drag.start.x, p.y - drag.start.y) > 0.3;
-  if (moved && selected === drag.car) {
-    const near = nearestDest(p, 0.6);
-    if (near != null) moveTo(near);
-  } else if (!moved && drag.wasSelected) {
-    select(drag.car); // second tap on a selected car deselects it
+  if (!drag.moved && Math.hypot(p.x - drag.start.x, p.y - drag.start.y) < 0.15) return;
+  drag.moved = true;
+  const [ox, oy] = level.nodes[positions[drag.car]];
+  let best = null;
+  for (const n of movesForCar(level, adj, positions, drag.car)) {
+    const [dx, dy] = level.nodes[n];
+    const vx = dx - ox, vy = dy - oy;
+    const t = Math.max(0, Math.min(1, ((p.x - ox) * vx + (p.y - oy) * vy) / (vx * vx + vy * vy)));
+    const x = ox + t * vx, y = oy + t * vy;
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (!best || d < best.d) best = { node: n, t, x, y, d };
   }
-  drag = null;
+  if (!best) return;
+  drag.along = best;
+  const g = carEls[drag.car];
+  g.classList.add('dragging');
+  g.style.transform = `translate(${best.x}px, ${best.y}px)`;
 });
 
-board.addEventListener('pointercancel', () => { drag = null; });
+board.addEventListener('pointerup', () => {
+  if (!drag) return;
+  const { car, moved, along, wasSelected } = drag;
+  drag = null;
+  carEls[car].classList.remove('dragging');
+  if (moved) {
+    // Past halfway it arrives; otherwise it slides back.
+    if (along && along.t > 0.4 && selected === car) moveTo(along.node);
+    else update();
+  } else if (wasSelected) {
+    select(car); // second tap on a selected car deselects it
+  }
+});
+
+board.addEventListener('pointercancel', () => {
+  if (!drag) return;
+  carEls[drag.car].classList.remove('dragging');
+  drag = null;
+  update();
+});
 
 function nearestDest(p, maxDist = 0.45) {
   if (selected == null) return null;
@@ -262,6 +356,7 @@ document.addEventListener('keydown', (evt) => {
   if (document.querySelector('dialog[open]')) return;
   if ((evt.key === 'z' && (evt.ctrlKey || evt.metaKey)) || evt.key === 'Backspace') undo();
   else if (evt.key === 'r') reset();
+  else if (evt.key === 's') toggleAutoplay();
   else if (evt.key === 'ArrowRight') loadLevel(store.current + 1);
   else if (evt.key === 'ArrowLeft') loadLevel(store.current - 1);
 });
@@ -270,7 +365,8 @@ document.addEventListener('keydown', (evt) => {
 
 $('btn-undo').onclick = undo;
 $('btn-reset').onclick = reset;
-$('btn-hint').onclick = showHint;
+$('btn-hint').onclick = () => { if (!autoplay) showHint(); };
+$('btn-solve').onclick = toggleAutoplay;
 $('btn-prev').onclick = () => loadLevel(store.current - 1);
 $('btn-next').onclick = () => loadLevel(store.current + 1);
 $('btn-help').onclick = () => $('dlg-help').showModal();
