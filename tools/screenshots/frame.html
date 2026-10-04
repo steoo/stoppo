@@ -60,11 +60,14 @@
   <div class="panel"><iframe id="app"></iframe></div>
   <script>
     const q = new URLSearchParams(location.search);
-    const ipad = q.get('device') === 'ipad';
-    // Canvas in CSS px (rendered at 3x for iPhone 6.9", 2x for iPad 13")
-    const D = ipad
-      ? { w: 1032, h: 1376, dw: 1032, dh: 1376, s: 0.74, radius: 36, title: '56px', sub: '26px' }
-      : { w: 440, h: 956, dw: 440, dh: 956, s: 0.76, radius: 54, title: '40px', sub: '19px' };
+    // Canvas in CSS px, rendered at 3x for iPhones and 2x for iPad:
+    // iphone = 6.9" (1320×2868), iphone65 = 6.5" (1284×2778), ipad = 13" (2064×2752)
+    const DEVICES = {
+      iphone: { w: 440, h: 956, dw: 440, dh: 956, s: 0.76, radius: 54, title: '40px', sub: '19px' },
+      iphone65: { w: 428, h: 926, dw: 428, dh: 926, s: 0.76, radius: 50, title: '39px', sub: '18px' },
+      ipad: { w: 1032, h: 1376, dw: 1032, dh: 1376, s: 0.74, radius: 36, title: '56px', sub: '26px' },
+    };
+    const D = DEVICES[q.get('device')] ?? DEVICES.iphone;
     const root = document.documentElement.style;
     for (const [k, v] of Object.entries(D)) root.setProperty(`--${k}`, typeof v === 'number' && k !== 's' ? `${v}px` : v);
 

@@ -1,7 +1,8 @@
 #!/bin/bash
 # Renders App Store screenshots into assets/screenshots/ with headless Chrome:
-#   iPhone 6.9" → 1320×2868, iPad 13" → 2064×2752.
-#   tools/screenshots/make.sh
+#   iPhone 6.9" → 1320×2868, iPhone 6.5" → 1284×2778, iPad 13" → 2064×2752.
+#   tools/screenshots/make.sh            # all devices
+#   ONLY=iphone65 tools/screenshots/make.sh   # one device
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -29,6 +30,7 @@ urlencode() { python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys
 
 shoot() { # device css_w css_h scale out_w out_h
   local device=$1 w=$2 h=$3 scale=$4 ow=$5 oh=$6
+  if [ -n "${ONLY:-}" ] && [ "$ONLY" != "$device" ]; then return; fi
   for scene in "${SCENES[@]}"; do
     IFS='|' read -r name level title subtitle extra <<<"$scene"
     local url="http://localhost:$PORT/tools/screenshots/frame.html?device=$device&level=$level&title=$(urlencode "$title")&subtitle=$(urlencode "$subtitle")$extra"
@@ -46,4 +48,5 @@ shoot() { # device css_w css_h scale out_w out_h
 }
 
 shoot iphone 440 956 3 1320 2868
+shoot iphone65 428 926 3 1284 2778
 shoot ipad 1032 1376 2 2064 2752
