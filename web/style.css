@@ -1,3 +1,21 @@
+/* Nunito (SIL OFL, see fonts/OFL.txt), self-hosted so the app works offline */
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 600 900;
+  font-display: swap;
+  src: url("fonts/nunito-latin-ext.woff2") format("woff2");
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: "Nunito";
+  font-style: normal;
+  font-weight: 600 900;
+  font-display: swap;
+  src: url("fonts/nunito-latin.woff2") format("woff2");
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
 :root {
   --bg: #f5efe3;
   --surface: #fffdf8;
@@ -34,9 +52,13 @@ html, body {
   height: 100%;
   background: var(--bg);
   color: var(--ink);
-  font-family: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, sans-serif;
+  font-family: "Nunito", ui-rounded, system-ui, -apple-system, sans-serif;
   font-weight: 700;
   -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-text-size-adjust: 100%;
   overscroll-behavior: none;
   touch-action: manipulation;
 }
@@ -180,6 +202,8 @@ svg path { stroke-linecap: round; stroke-linejoin: round; }
   transition: opacity 120ms;
 }
 .car.selected .ring { opacity: 1; }
+.car.pick .ring { animation: pick 0.65s ease-in-out 2; }
+@keyframes pick { 50% { opacity: 1; } }
 .car.hint .ring { opacity: 1; stroke-dasharray: 0.14 0.1; animation: spin 2s linear infinite; }
 @keyframes spin { to { stroke-dashoffset: -0.48; } }
 .car.stuck .pip { animation: shake 0.28s; }
@@ -285,4 +309,13 @@ dialog.win p { font-weight: 600; color: var(--muted); }
 
 @media (min-width: 700px) {
   dialog.sheet { margin: auto; border-radius: 24px; }
+}
+
+/* iPad and other large screens: bigger board, centered controls */
+@media (min-width: 700px) and (min-height: 600px) {
+  #board { max-width: 1100px; }
+  .topbar, .toolbar { width: 100%; max-width: 640px; margin: 0 auto; }
+  .title h1 { font-size: 24px; }
+  .toolbar .tool { font-size: 13px; padding: 10px 0 9px; }
+  .level-grid { grid-template-columns: repeat(auto-fill, minmax(68px, 1fr)); }
 }

@@ -1,0 +1,11 @@
+{
+  "appId": "com.steoo.stoppo",
+  "appName": "Stoppo",
+  "webDir": "web",
+  "backgroundColor": "#f5efe3",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "backgroundColor": "#f5efe3"
+  }
+}

@@ -1,8 +1,10 @@
 import { COLORS, buildAdjacency, initialState, occupancy, movesForCar, isSolved, solve } from './engine.js';
 import { LEVELS } from './levels.js';
+import { callNative } from './native.js';
+import { emptyProgress, loadLocal, loadAll, saveAll, mergeProgress, onRemoteProgress } from './storage.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const STORE_KEY = 'stoppo/v1';
+const HELP_KEY = 'stoppo/v1/seen-help';
 const R_STATION = 0.22;
 const R_CAR = 0.29;
 const R_GOAL = 0.38;
@@ -11,19 +13,18 @@ const TRACK = 0.2;
 const $ = (id) => document.getElementById(id);
 const board = $('board');
 
-const store = loadStore();
+const store = loadLocal() ?? emptyProgress();
 let level, adj, positions, history, selected, carEls, hint;
 let autoplay = null; // { timer, moves, step } while the solver plays the level
 
-function loadStore() {
-  try {
-    return { current: 0, best: {}, ...JSON.parse(localStorage.getItem(STORE_KEY) || '{}') };
-  } catch {
-    return { current: 0, best: {} };
-  }
-}
 function saveStore() {
-  try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch { /* storage unavailable */ }
+  store.updatedAt = Date.now();
+  saveAll(store);
+}
+
+// Haptic feedback in the native app; a no-op in the browser.
+function haptic(method, options) {
+  callNative('Haptics', method, options).catch(() => {});
 }
 
 function el(tag, attrs = {}, parent) {
@@ -35,10 +36,10 @@ function el(tag, attrs = {}, parent) {
 
 // ---------- level lifecycle ----------
 
-function loadLevel(index) {
+function loadLevel(index, { save = true } = {}) {
   stopAutoplay();
   store.current = Math.max(0, Math.min(LEVELS.length - 1, index));
-  saveStore();
+  if (save) saveStore();
   level = LEVELS[store.current];
   adj = buildAdjacency(level);
   positions = initialState(level);
@@ -160,6 +161,7 @@ function select(i) {
     g.classList.remove('stuck');
     void g.getBBox(); // restart the animation
     g.classList.add('stuck');
+    haptic('notification', { type: 'WARNING' });
     update();
     return;
   }
@@ -174,6 +176,7 @@ function moveTo(node) {
   positions[selected] = node;
   selected = null;
   hint = null;
+  haptic('impact', { style: 'LIGHT' });
   update();
   if (isSolved(level, positions)) setTimeout(win, 220);
 }
@@ -266,6 +269,7 @@ function win({ auto = false } = {}) {
     const prev = store.best[store.current];
     if (prev == null || n < prev) store.best[store.current] = n;
     saveStore();
+    haptic('notification', { type: 'SUCCESS' });
     if (par != null && n <= par) {
       title = 'Perfect run!';
       text = `${level.name} in ${n} move${n === 1 ? '' : 's'} — the fewest possible.`;
@@ -307,8 +311,41 @@ board.addEventListener('pointerdown', (evt) => {
   const p = toBoard(evt);
   const near = nearestDest(p);
   if (near != null) { moveTo(near); return; }
+  // Tapping an empty station moves the one car that can reach it.
+  const station = nearestEmptyStation(p);
+  if (station != null) {
+    const cars = positions.map((_, i) => i).filter((i) => movesForCar(level, adj, positions, i).includes(station));
+    if (cars.length === 1) { selected = cars[0]; moveTo(station); return; }
+    if (cars.length > 1) { pickOne(cars); return; }
+  }
   if (selected != null) { selected = null; hint = null; update(); }
 });
+
+function nearestEmptyStation(p, maxDist = 0.4) {
+  const occ = occupancy(level, positions);
+  let best = null, bestD = maxDist;
+  level.nodes.forEach(([x, y], n) => {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (occ[n] === -1 && d < bestD) { best = n; bestD = d; }
+  });
+  return best;
+}
+
+// Several cars could take that spot: flash them and let the player choose.
+function pickOne(cars) {
+  selected = null;
+  hint = null;
+  update();
+  for (const i of cars) {
+    const g = carEls[i];
+    g.classList.remove('pick');
+    void g.getBBox(); // restart the animation
+    g.classList.add('pick');
+  }
+  clearTimeout(pickOne.t);
+  pickOne.t = setTimeout(() => carEls.forEach((g) => g.classList.remove('pick')), 1300);
+  flashStatus(`${cars.length} cars can go there — pick one`);
+}
 
 // While dragging, the car slides along whichever open track is closest to the finger.
 board.addEventListener('pointermove', (evt) => {
@@ -409,10 +446,30 @@ function openLevels() {
 
 // ?level=N opens level N directly (handy for testing and sharing).
 const urlLevel = Number(new URLSearchParams(location.search).get('level'));
-loadLevel(urlLevel >= 1 ? urlLevel - 1 : store.current);
+if (urlLevel >= 1) loadLevel(urlLevel - 1);
+else loadLevel(store.current, { save: false });
+
+// Native storage and iCloud may hold newer progress than localStorage.
+loadAll().then((saved) => {
+  const merged = mergeProgress(store, saved);
+  store.best = merged.best;
+  // Jump to the newer saved level only if the player hasn't started moving yet.
+  if (!urlLevel && merged.current !== store.current && !history.length) {
+    store.updatedAt = merged.updatedAt;
+    loadLevel(merged.current, { save: false });
+  }
+  saveAll(store);
+});
+
+// Progress from another device: take its best scores, but stay on this level.
+onRemoteProgress((remote) => {
+  Object.assign(store.best, mergeProgress(store, remote).best);
+  saveAll(store);
+});
+
 let seenHelp = true;
 try {
-  seenHelp = !!localStorage.getItem(STORE_KEY + '/seen-help');
-  localStorage.setItem(STORE_KEY + '/seen-help', '1');
+  seenHelp = !!localStorage.getItem(HELP_KEY);
+  localStorage.setItem(HELP_KEY, '1');
 } catch { /* storage unavailable */ }
 if (!seenHelp) $('dlg-help').showModal();

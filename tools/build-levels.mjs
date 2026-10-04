@@ -15,9 +15,9 @@
 // The script checks every level with the BFS solver and fails on a par mismatch.
 
 import { writeFileSync } from 'node:fs';
-import { solve } from '../js/engine.js';
+import { solve } from '../web/js/engine.js';
 
-const OUT = new URL('../js/levels.js', import.meta.url);
+const OUT = new URL('../web/js/levels.js', import.meta.url);
 const C = { r: 0, b: 1, g: 2, y: 3, p: 4, o: 5 };
 const L = [
   [3, 'D', {A:[310,410,'R'],B:[550,410,'b'],C:[550,200,''],D:[790,410,'']}, 'AB r, BD r, BC b'],
