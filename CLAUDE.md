@@ -15,6 +15,7 @@ Mobile-first sliding puzzle on a transit map (cars ride lines of their own color
 - `web/js/app.js`: SVG rendering, input (drag along lines or tap), undo/reset/hint, the Solve autoplay (testing aid), and `localStorage` progress.
 - `web/js/levels.js`: generated level data; edit `tools/build-levels.mjs` instead.
 - `web/js/storage.js`: progress (`{ current, best, updatedAt }`) saved to localStorage, native Preferences and iCloud key-value storage (`CloudStore`), merged on load (lowest best per level, newest `current`). Remote iCloud changes merge best scores only.
+- `web/js/stats.js`: player stats for the Progress sheet (cleared, perfect, score = Σ 100·par/best, efficiency, day streak, time played, totals). Counters live per device in `progress.devices[deviceId]` and only grow, so sync merges by max per device; `track()` in `app.js` records them. Auto-solve never counts.
 - `web/js/native.js`: `callNative`/`onNative` wrap `Capacitor.nativePromise`/`addListener`. Use these for native plugins; there's no bundler, so `@capacitor/*` JS packages aren't imported.
 - `tools/build-levels.mjs`: the level source, transcribed from `reference/LevelNNN.jpg` (gitignored). The 100 levels come from another game's designer, who gave permission to use them (confirmed by the owner, 2026-10-04; keep the written confirmation). Some station pairs have two parallel lines of different colors.
 - `tools/generate.mjs`: old random level generator. Don't run it; it overwrites `web/js/levels.js` with random levels.

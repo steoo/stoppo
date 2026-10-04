@@ -16,7 +16,7 @@
 <body>
   <div id="app">
     <header class="topbar">
-      <button id="btn-levels" class="icon-btn" aria-label="Levels">
+      <button id="btn-levels" class="icon-btn" aria-label="Progress and levels">
         <svg viewBox="0 0 24 24"><circle cx="6" cy="6" r="2.6"/><circle cx="12" cy="6" r="2.6"/><circle cx="18" cy="6" r="2.6"/><circle cx="6" cy="12" r="2.6"/><circle cx="12" cy="12" r="2.6"/><circle cx="18" cy="12" r="2.6"/><circle cx="6" cy="18" r="2.6"/><circle cx="12" cy="18" r="2.6"/><circle cx="18" cy="18" r="2.6"/></svg>
       </button>
       <div class="title">
@@ -61,9 +61,15 @@
 
   <dialog id="dlg-levels" class="sheet">
     <div class="sheet-head">
-      <h2>Levels</h2>
+      <h2>Progress</h2>
       <form method="dialog"><button class="icon-btn" aria-label="Close">✕</button></form>
     </div>
+    <div class="stats">
+      <div class="stats-progress"><div id="stats-bar"></div></div>
+      <div id="stats-tiles" class="stats-tiles"></div>
+      <p id="stats-totals" class="stats-totals"></p>
+    </div>
+    <h3 class="sheet-sub">Levels</h3>
     <div id="level-grid" class="level-grid"></div>
   </dialog>
 
