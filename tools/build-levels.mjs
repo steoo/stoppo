@@ -1,6 +1,6 @@
-// Source for js/levels.js: the current 100 levels, transcribed from the
-// reference images in reference/LevelNNN.jpg (gitignored). These are placeholder
-// levels for development and must be replaced by our own before launch.
+// Source for web/js/levels.js: the 100 levels, transcribed from the reference
+// images in reference/LevelNNN.jpg (gitignored). Used with the permission of
+// their original designer.
 //
 //   node tools/build-levels.mjs
 //

@@ -16,7 +16,7 @@ Mobile-first sliding puzzle on a transit map (cars ride lines of their own color
 - `web/js/levels.js`: generated level data; edit `tools/build-levels.mjs` instead.
 - `web/js/storage.js`: progress (`{ current, best, updatedAt }`) saved to localStorage, native Preferences and iCloud key-value storage (`CloudStore`), merged on load (lowest best per level, newest `current`). Remote iCloud changes merge best scores only.
 - `web/js/native.js`: `callNative`/`onNative` wrap `Capacitor.nativePromise`/`addListener`. Use these for native plugins; there's no bundler, so `@capacitor/*` JS packages aren't imported.
-- `tools/build-levels.mjs`: the level source, transcribed from `reference/LevelNNN.jpg` (gitignored). The current 100 levels are third-party placeholders for development and must be replaced with our own before launch. Some station pairs have two parallel lines of different colors.
+- `tools/build-levels.mjs`: the level source, transcribed from `reference/LevelNNN.jpg` (gitignored). The 100 levels come from another game's designer, who gave permission to use them (confirmed by the owner, 2026-10-04; keep the written confirmation). Some station pairs have two parallel lines of different colors.
 - `tools/generate.mjs`: old random level generator. Don't run it; it overwrites `web/js/levels.js` with random levels.
 - `web/index.html`, `web/style.css`, `web/icon.svg`, `web/fonts/`: app shell, layout, favicon and self-hosted Nunito (keep it offline: no CDN links).
 - `ios/`: Capacitor Xcode project (bundle ID `com.steoo.stoppo`, team `4WFCSZ9R44`, iPhone portrait-only, iPad all orientations). `ios/App/App/public` is generated; don't edit it. `ios/App/App/CloudStorePlugin.swift` is our own iCloud key-value plugin, registered in `MainViewController` (the root view controller); its entitlement is in `App.entitlements`. New Swift files must be added to `project.pbxproj` (no synchronized folders).
@@ -29,7 +29,9 @@ Mobile-first sliding puzzle on a transit map (cars ride lines of their own color
 - Every level's `par` must equal its BFS-optimal move count.
 - `package.json` sets `"type": "module"` so Node can run `tools/` and import `web/js/engine.js`.
 - Native-only features go through `window.Capacitor` behind a check (see `haptic()` in `app.js`) so the browser build keeps working without Capacitor.
+- Release builds (`Capacitor.DEBUG` false, see `isReleaseApp` in `native.js`) hide testing aids like Solve; the browser and debug builds keep them.
+- `ios/App/App/PrivacyInfo.xcprivacy`: no tracking, no data collected; declares `UserDefaults` (reason CA92.1, used by Preferences). Update it if a new SDK or required-reason API is added.
 - Keep it mobile-first: test at phone width and with touch input. `?level=N` opens a level directly.
-- Brand: Stoppo. Don't reference the game these levels came from anywhere in the product or repo.
+- Brand: Stoppo. Don't name the game the levels came from in the product unless the owner decides to add a credit.
 - Look: cream transit map (Mini Metro-like), flat lines, ink-outlined stations, flat bouncy cars (Two Dots-like). Colors live in `COLORS` (`js/engine.js`) and CSS tokens on `:root` (`style.css`, with a dark-mode set).
 - Headless Chrome screenshots: macOS has no `timeout`; use `perl -e 'alarm 40; exec @ARGV' "<chrome>" --headless=new --user-data-dir=<tmp> ...`. The window is at least 500px wide, so wrap the page in a 390px iframe to see phone width.

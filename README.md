@@ -61,4 +61,4 @@ Progress and best scores are saved on the device; in the iOS app they're also ke
 
 Colors are indices into `COLORS` in `web/js/engine.js`. An edge pair may appear twice with different colors (parallel tracks).
 
-The current levels are placeholders for development and will be replaced by original Stoppo levels before launch. After editing `tools/build-levels.mjs`, rebuild with `node tools/build-levels.mjs`; it fails if any level's optimal solution differs from its par.
+The 100 levels are used with the permission of their original designer. After editing `tools/build-levels.mjs`, rebuild with `node tools/build-levels.mjs`; it fails if any level's optimal solution differs from its par.

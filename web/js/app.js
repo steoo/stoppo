@@ -1,6 +1,6 @@
 import { COLORS, buildAdjacency, initialState, occupancy, movesForCar, isSolved, solve } from './engine.js';
 import { LEVELS } from './levels.js';
-import { callNative } from './native.js';
+import { callNative, isReleaseApp } from './native.js';
 import { emptyProgress, loadLocal, loadAll, saveAll, mergeProgress, onRemoteProgress } from './storage.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -80,7 +80,6 @@ function render() {
   }
 
   // Stations; the goal gets a ring and a halo in Stoppo's color
-  const [gx, gy] = level.nodes[level.target.node];
   const targetColor = COLORS[level.cars[level.target.car][1]].fill;
   const stations = el('g', {}, board);
   level.nodes.forEach(([cx, cy], n) => {
@@ -215,6 +214,7 @@ function showHint() {
 
 // Testing aid: the solver plays the level from the current position.
 function toggleAutoplay() {
+  if (isReleaseApp) return;
   if (autoplay) { stopAutoplay(); return; }
   if (isSolved(level, positions)) return;
   const { moves } = solve(level, positions);
@@ -343,7 +343,9 @@ function pickOne(cars) {
     g.classList.add('pick');
   }
   clearTimeout(pickOne.t);
-  pickOne.t = setTimeout(() => carEls.forEach((g) => g.classList.remove('pick')), 1300);
+  pickOne.t = setTimeout(() => {
+    for (const g of carEls) g.classList.remove('pick');
+  }, 1300);
   flashStatus(`${cars.length} cars can go there — pick one`);
 }
 
@@ -413,6 +415,26 @@ document.addEventListener('keydown', (evt) => {
 
 // ---------- buttons & dialogs ----------
 
+// iOS WebKit sometimes swallows the first tap on a button as a "hover" when
+// something on the page is animating, so a button needs two taps. Fire buttons
+// on touch release instead, and drop the native click that may follow.
+let suppressClickUntil = 0;
+document.addEventListener('pointerup', (evt) => {
+  if (evt.pointerType !== 'touch') return;
+  const button = evt.target.closest('button');
+  if (!button || button.disabled) return;
+  if (!button.contains(document.elementFromPoint(evt.clientX, evt.clientY))) return; // finger slid off
+  suppressClickUntil = performance.now() + 500;
+  button.click();
+}, true);
+document.addEventListener('click', (evt) => {
+  if (evt.isTrusted && performance.now() < suppressClickUntil) {
+    evt.preventDefault();
+    evt.stopPropagation();
+    suppressClickUntil = 0;
+  }
+}, true);
+
 $('btn-undo').onclick = undo;
 $('btn-reset').onclick = reset;
 $('btn-hint').onclick = () => { if (!autoplay) showHint(); };
@@ -466,6 +488,9 @@ onRemoteProgress((remote) => {
   Object.assign(store.best, mergeProgress(store, remote).best);
   saveAll(store);
 });
+
+// Testing aids (the Solve button) are left out of the App Store build.
+if (isReleaseApp) document.body.classList.add('release');
 
 let seenHelp = true;
 try {

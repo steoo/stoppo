@@ -5,6 +5,9 @@ const cap = window.Capacitor;
 
 export const isNative = !!cap?.isNativePlatform?.();
 
+// The App Store build: native and not a debug build. Testing aids are hidden here.
+export const isReleaseApp = isNative && !cap.DEBUG;
+
 // Calls a native plugin method; resolves to undefined in the browser.
 export function callNative(plugin, method, options) {
   if (!isNative) return Promise.resolve(undefined);
