@@ -1,0 +1,107 @@
+<!doctype html>
+<!--
+  App Store screenshot frame. Renders the real game (web/) inside a device
+  panel with a caption. Driven by tools/screenshots/make.sh; query params:
+    device=iphone|ipad  level=N  title=…  subtitle=…  dark=1
+    action=hint|progress  seed=progress (fills in sample stats)
+-->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    @font-face {
+      font-family: "Nunito";
+      font-weight: 600 900;
+      src: url("../../web/fonts/nunito-latin.woff2") format("woff2");
+    }
+    :root { --bg: #f5efe3; --ink: #262a36; --muted: #7d7768; --panel-shadow: rgba(60, 45, 20, 0.22); }
+    .dark { --bg: #1c1f2a; --ink: #eef0f6; --muted: #9aa0b2; --panel-shadow: rgba(0, 0, 0, 0.5); }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; }
+    body {
+      width: 100vw; /* content is centered; make.sh center-crops to the exact size */
+      height: var(--h);
+      overflow: hidden;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "Nunito", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    header { text-align: center; padding: calc(var(--h) * 0.055) 24px 0; }
+    h1 { margin: 0; font-size: var(--title); font-weight: 900; letter-spacing: -0.02em; line-height: 1.05; }
+    p { margin: 10px 0 0; font-size: var(--sub); font-weight: 700; color: var(--muted); }
+    .dot { display: inline-block; width: 0.42em; height: 0.42em; border-radius: 50%; background: #ef4444; vertical-align: 0.12em; margin-left: 0.08em; }
+    .panel {
+      position: relative;
+      margin-top: calc(var(--h) * 0.045);
+      width: calc(var(--dw) * var(--s));
+      height: calc(var(--dh) * var(--s));
+      border-radius: calc(var(--radius) * var(--s));
+      overflow: hidden;
+      background: var(--bg);
+      box-shadow: 0 0 0 calc(10px * var(--s)) var(--ink), 0 30px 60px var(--panel-shadow);
+    }
+    iframe {
+      width: var(--dw);
+      height: var(--dh);
+      border: 0;
+      transform: scale(var(--s));
+      transform-origin: 0 0;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title"></h1>
+    <p id="subtitle"></p>
+  </header>
+  <div class="panel"><iframe id="app"></iframe></div>
+  <script>
+    const q = new URLSearchParams(location.search);
+    const ipad = q.get('device') === 'ipad';
+    // Canvas in CSS px (rendered at 3x for iPhone 6.9", 2x for iPad 13")
+    const D = ipad
+      ? { w: 1032, h: 1376, dw: 1032, dh: 1376, s: 0.74, radius: 36, title: '56px', sub: '26px' }
+      : { w: 440, h: 956, dw: 440, dh: 956, s: 0.76, radius: 54, title: '40px', sub: '19px' };
+    const root = document.documentElement.style;
+    for (const [k, v] of Object.entries(D)) root.setProperty(`--${k}`, typeof v === 'number' && k !== 's' ? `${v}px` : v);
+
+    document.getElementById('title').textContent = q.get('title') ?? '';
+    document.getElementById('subtitle').textContent = q.get('subtitle') ?? '';
+    const dark = q.get('dark') === '1';
+    if (dark) document.body.classList.add('dark');
+
+    try {
+      localStorage.setItem('stoppo/v1/seen-help', '1');
+      if (q.get('seed') === 'progress') {
+        const pars = [3, 10, 12, 11, 13, 15, 17, 16, 19, 16, 17, 19, 24, 23, 21, 21, 26, 24, 30, 22, 22, 27, 28, 28, 29, 29, 37, 24, 41, 34, 34, 38, 24, 36, 43, 37, 40, 46];
+        const best = {};
+        pars.forEach((par, i) => { best[i] = i % 4 === 3 ? par + 2 + (i % 3) : par; });
+        const days = [];
+        for (let d = 0; d < 9; d++) days.push(new Date(Date.now() - d * 864e5).toISOString().slice(0, 10));
+        localStorage.setItem('stoppo/v1', JSON.stringify({
+          current: pars.length, best, updatedAt: 1, days,
+          devices: { a: { moves: 1186, hints: 6, undos: 73, resets: 14, solves: 41, timeMs: 9_480_000 } },
+        }));
+      } else {
+        localStorage.removeItem('stoppo/v1');
+      }
+    } catch { /* storage unavailable */ }
+
+    const frame = document.getElementById('app');
+    if (dark) frame.style.colorScheme = 'dark';
+    frame.src = `../../web/index.html?level=${q.get('level') ?? 1}`;
+    frame.onload = () => {
+      const doc = frame.contentDocument;
+      doc.body.classList.add('release'); // App Store look: no testing aids
+      const action = q.get('action');
+      setTimeout(() => {
+        if (action === 'hint') doc.getElementById('btn-hint').click();
+        if (action === 'progress') doc.getElementById('btn-levels').click();
+      }, 400);
+    };
+  </script>
+</body>
+</html>
