@@ -2,9 +2,11 @@ import { COLORS, buildAdjacency, initialState, occupancy, movesForCar, isSolved,
 import { LEVELS } from './levels.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
-const STORE_KEY = 'subway-shuffle/v1';
-const R_STATION = 0.27;
-const R_GOAL = 0.4;
+const STORE_KEY = 'stoppo/v1';
+const R_STATION = 0.22;
+const R_CAR = 0.29;
+const R_GOAL = 0.38;
+const TRACK = 0.2;
 
 const $ = (id) => document.getElementById(id);
 const board = $('board');
@@ -54,7 +56,6 @@ function render() {
   const minX = Math.min(...xs) - pad, minY = Math.min(...ys) - pad;
   board.setAttribute('viewBox', `${minX} ${minY} ${Math.max(...xs) - minX + pad} ${Math.max(...ys) - minY + pad}`);
 
-  // Tracks
   // Tracks; several lines between the same two stations run side by side
   const tracks = el('g', {}, board);
   const pairs = new Map();
@@ -67,9 +68,9 @@ function render() {
     const [x1, y1] = level.nodes[a], [x2, y2] = level.nodes[b];
     const len = Math.hypot(x2 - x1, y2 - y1);
     const nx = -(y2 - y1) / len, ny = (x2 - x1) / len; // unit normal
-    const width = colors.length > 1 ? 0.16 : 0.27;
+    const width = colors.length > 1 ? TRACK * 0.7 : TRACK;
     colors.forEach((c, k) => {
-      const off = (k - (colors.length - 1) / 2) * width;
+      const off = (k - (colors.length - 1) / 2) * width * 1.15;
       el('line', {
         x1: x1 + nx * off, y1: y1 + ny * off, x2: x2 + nx * off, y2: y2 + ny * off,
         class: 'track', stroke: COLORS[c].fill, 'stroke-width': width,
@@ -77,16 +78,15 @@ function render() {
     });
   }
 
-  // Stations; the goal gets a thick ring in the target car's color
+  // Stations; the goal gets a ring and a halo in Stoppo's color
   const [gx, gy] = level.nodes[level.target.node];
   const targetColor = COLORS[level.cars[level.target.car][1]].fill;
   const stations = el('g', {}, board);
   level.nodes.forEach(([cx, cy], n) => {
     if (n === level.target.node) {
-      el('circle', { cx: gx, cy: gy, r: R_GOAL + 0.085, class: 'goal-ring-edge' }, stations);
-      el('circle', { cx: gx, cy: gy, r: R_GOAL, class: 'goal-ring-band', stroke: targetColor }, stations);
-      el('circle', { cx: gx, cy: gy, r: R_GOAL - 0.085, class: 'goal-ring-edge' }, stations);
-      el('circle', { cx: gx, cy: gy, r: R_GOAL - 0.085, class: 'station', stroke: 'none' }, stations);
+      el('circle', { cx, cy, r: R_GOAL, class: 'goal-halo', stroke: targetColor }, stations);
+      el('circle', { cx, cy, r: R_STATION, class: 'station' }, stations);
+      el('circle', { cx, cy, r: R_GOAL, class: 'goal-ring', stroke: targetColor }, stations);
     } else {
       el('circle', { cx, cy, r: R_STATION, class: 'station' }, stations);
     }
@@ -95,21 +95,19 @@ function render() {
   // Destination markers live in their own layer, refreshed on selection
   el('g', { id: 'dests' }, board);
 
-  // Cars
+  // Cars; Stoppo (the target car) has eyes that look toward the goal
   const cars = el('g', {}, board);
   carEls = level.cars.map(([, c], i) => {
     const g = el('g', { class: 'car', 'data-car': i }, cars);
-    g.style.setProperty('--car-color', COLORS[c].fill);
-    el('circle', { class: 'body', r: R_STATION, fill: COLORS[c].fill }, g);
-    el('ellipse', { class: 'gloss', cx: 0, cy: -0.13, rx: 0.17, ry: 0.09 }, g);
+    const pip = el('g', { class: 'pip' }, g);
+    el('circle', { class: 'ring', r: R_CAR + 0.09 }, pip);
+    el('ellipse', { class: 'shadow', cx: 0, cy: 0.06, rx: R_CAR, ry: R_CAR * 0.95 }, pip);
+    el('circle', { class: 'body', r: R_CAR, fill: COLORS[c].fill }, pip);
     if (i === level.target.car) {
-      // Little front-on train
-      el('rect', { class: 'train', x: -0.14, y: -0.17, width: 0.28, height: 0.3, rx: 0.06 }, g);
-      el('rect', { class: 'train-glass', x: -0.1, y: -0.12, width: 0.2, height: 0.1, rx: 0.02 }, g);
-      el('circle', { class: 'train-glass', cx: -0.07, cy: 0.06, r: 0.025 }, g);
-      el('circle', { class: 'train-glass', cx: 0.07, cy: 0.06, r: 0.025 }, g);
-      el('rect', { class: 'train', x: -0.12, y: 0.15, width: 0.07, height: 0.04, rx: 0.015 }, g);
-      el('rect', { class: 'train', x: 0.05, y: 0.15, width: 0.07, height: 0.04, rx: 0.015 }, g);
+      for (const ex of [-0.1, 0.1]) {
+        el('circle', { class: 'eye', cx: ex, cy: -0.03, r: 0.085 }, pip);
+        el('circle', { class: 'pupil', cx: ex, cy: -0.03, r: 0.042 }, pip);
+      }
     }
     return g;
   });
@@ -128,10 +126,18 @@ function update() {
   const dests = $('dests');
   dests.replaceChildren();
   const targets = selected != null ? movesForCar(level, adj, positions, selected) : [];
+  const destColor = selected != null ? COLORS[level.cars[selected][1]].fill : '';
   for (const n of targets) {
     const [cx, cy] = level.nodes[n];
-    el('circle', { cx, cy, r: 0.2, class: 'dest', 'data-node': n }, dests);
+    el('circle', { cx, cy, r: 0.13, class: 'dest', fill: destColor, 'data-node': n }, dests);
   }
+
+  // Stoppo looks toward the goal.
+  const [sx, sy] = level.nodes[positions[level.target.car]];
+  const [gx, gy] = level.nodes[level.target.node];
+  const d = Math.hypot(gx - sx, gy - sy) || 1;
+  const look = `translate(${((gx - sx) / d) * 0.035}px, ${((gy - sy) / d) * 0.035}px)`;
+  for (const pupil of carEls[level.target.car].querySelectorAll('.pupil')) pupil.style.transform = look;
 
   $('level-name').textContent = level.name;
   $('moves').textContent = history.length;
@@ -200,7 +206,7 @@ function showHint() {
   update();
   // Mark the station the hinted car should go to.
   const dot = $('dests').querySelector(`[data-node="${m.to}"]`);
-  if (dot) dot.setAttribute('r', 0.27);
+  if (dot) dot.setAttribute('r', 0.18);
   flashStatus(`${moves.length} moves to go`);
 }
 
@@ -216,7 +222,7 @@ function toggleAutoplay() {
   selected = null;
   hint = null;
   autoplay = { moves, step: 0, timer: setInterval(autoStep, ms) };
-  $('btn-solve').textContent = 'Stop';
+  $('btn-solve').querySelector('span').textContent = 'Stop';
   update();
 }
 
@@ -236,7 +242,7 @@ function stopAutoplay() {
   clearInterval(autoplay.timer);
   autoplay = null;
   board.style.removeProperty('--move-ms');
-  $('btn-solve').textContent = 'Solve';
+  $('btn-solve').querySelector('span').textContent = 'Solve';
 }
 
 function flashStatus(text) {
@@ -251,16 +257,23 @@ function win({ auto = false } = {}) {
   const n = history.length;
   const par = level.par;
   let text;
+  let title = 'Arrived!';
   if (auto) {
     // Don't record auto-solves as the player's best.
-    text = `The solver finished ${level.name} in ${n} move${n === 1 ? '' : 's'} (par ${par}).`;
+    title = 'Solver arrived';
+    text = `${level.name} in ${n} move${n === 1 ? '' : 's'} (best possible: ${par}).`;
   } else {
     const prev = store.best[store.current];
     if (prev == null || n < prev) store.best[store.current] = n;
     saveStore();
-    text = `${level.name} solved in ${n} move${n === 1 ? '' : 's'}.`;
-    if (par != null) text += n <= par ? ' That matches par — perfect!' : ` Par is ${par}.`;
+    if (par != null && n <= par) {
+      title = 'Perfect run!';
+      text = `${level.name} in ${n} move${n === 1 ? '' : 's'} — the fewest possible.`;
+    } else {
+      text = `${level.name} in ${n} move${n === 1 ? '' : 's'}. It can be done in ${par}.`;
+    }
   }
+  $('win-title').textContent = title;
   $('win-text').textContent = text;
   $('win-next').disabled = store.current === LEVELS.length - 1;
   $('dlg-win').showModal();
@@ -385,7 +398,7 @@ function openLevels() {
   LEVELS.forEach((lvl, i) => {
     const b = document.createElement('button');
     const best = store.best[i];
-    b.innerHTML = `${i + 1}<small>${best != null ? `${best}/${lvl.par}` : `par ${lvl.par}`}</small>`;
+    b.innerHTML = `${i + 1}<small>${best != null ? `${best}/${lvl.par}` : lvl.par}</small>`;
     if (best != null) b.classList.add(best <= lvl.par ? 'perfect' : 'solved');
     if (i === store.current) b.classList.add('current');
     b.onclick = () => { $('dlg-levels').close(); loadLevel(i); };
@@ -394,7 +407,9 @@ function openLevels() {
   $('dlg-levels').showModal();
 }
 
-loadLevel(store.current);
+// ?level=N opens level N directly (handy for testing and sharing).
+const urlLevel = Number(new URLSearchParams(location.search).get('level'));
+loadLevel(urlLevel >= 1 ? urlLevel - 1 : store.current);
 let seenHelp = true;
 try {
   seenHelp = !!localStorage.getItem(STORE_KEY + '/seen-help');

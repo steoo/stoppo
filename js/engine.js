@@ -1,4 +1,4 @@
-// Core rules of Subway Shuffle, shared by the browser game and the level tools.
+// Core rules of Stoppo, shared by the browser game and the level tools.
 //
 // A level is a graph: stations (nodes) joined by colored track segments (edges).
 // Each car sits on a station. A car may move along one segment of its own
@@ -16,12 +16,12 @@
 //   }
 
 export const COLORS = [
-  { name: 'red', fill: '#e53935' },
-  { name: 'blue', fill: '#1e88e5' },
-  { name: 'green', fill: '#43a047' },
-  { name: 'yellow', fill: '#fdd835' },
-  { name: 'purple', fill: '#8e24aa' },
-  { name: 'orange', fill: '#fb8c00' },
+  { name: 'red', fill: '#ef4444' },
+  { name: 'blue', fill: '#2f6feb' },
+  { name: 'green', fill: '#1fae6a' },
+  { name: 'yellow', fill: '#f5b81c' },
+  { name: 'purple', fill: '#8b5cf6' },
+  { name: 'orange', fill: '#fb7a28' },
 ];
 
 // Adjacency per node: list of { to, color }.
